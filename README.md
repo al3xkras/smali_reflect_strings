@@ -1,0 +1,1 @@
+[smali] Detect string arguments/string argument properties of all methods in a package using the Java Reflection API
