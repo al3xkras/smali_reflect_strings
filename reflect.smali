@@ -148,14 +148,14 @@
     .line 64
     const/4 v4, 0x0
 
-    invoke-static {p0, v4}, Lcom/al3xkras/testapp/MainActivity;->checkForString(Ljava/lang/Object;I)Z
+    invoke-static {p0, v4}, L{class_name};->checkForString(Ljava/lang/Object;I)Z
 
     move-result v5
 
     if-nez v5, :cond_1
 
     .line 65
-    invoke-static {p0, v4}, Lcom/al3xkras/testapp/MainActivity;->reflectStringArgumentsRecursive(Ljava/lang/Object;I)V
+    invoke-static {p0, v4}, L{class_name};->reflectStringArgumentsRecursive(Ljava/lang/Object;I)V
 
     .line 66
     :cond_1
@@ -217,7 +217,7 @@
 
     .line 48
     .local v5, "value":Ljava/lang/Object;
-    invoke-static {v5, p1}, Lcom/al3xkras/testapp/MainActivity;->checkForString(Ljava/lang/Object;I)Z
+    invoke-static {v5, p1}, L{class_name};->checkForString(Ljava/lang/Object;I)Z
 
     move-result v6
 
@@ -226,7 +226,7 @@
     .line 49
     add-int/lit8 v6, p1, 0x1
 
-    invoke-static {v5, v6}, Lcom/al3xkras/testapp/MainActivity;->reflectStringArgumentsRecursive(Ljava/lang/Object;I)V
+    invoke-static {v5, v6}, L{class_name};->reflectStringArgumentsRecursive(Ljava/lang/Object;I)V
     :try_end_0
     .catch Ljava/lang/IllegalAccessException; {:try_start_0 .. :try_end_0} :catch_0
 

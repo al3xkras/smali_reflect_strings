@@ -17,13 +17,20 @@ ignored_methods = [
 ]
 
 ignored_classes = [
-    "trace"
+    "trace",
+    "UnityPlayer"
 ]
 
 primitive_types = "ZBSCIJFD"
 
+
+class FormatDict(dict):
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
 with open("./reflect.smali", "r") as f:
-    reflect_strings = f.read()
+    smali_injection = f.read()
 
 
 def strip_line(i_):
@@ -57,21 +64,19 @@ def handle_locals(file_, class_name: str, method_signature: str, current_line: s
     p0 = 0 if is_static_method(method_signature) else 1
     params = get_parameters(method_signature)
 
-    # print("METHOD:",method_signature)
-
     if class_name is not None:
         for j, p in enumerate(params):
             if p in primitive_types:
                 continue
             file_.write(
-                f"    invoke-static {{p{p0 + j}}}, L{class_name};->reflectStringArguments(Ljava/lang/Object;)V\n")
+                f"    invoke-static/range {{p{p0 + j} .. p{p0 + j}}}, L{class_name};->reflectStringArguments(Ljava/lang/Object;)V\n")
 
 
-def handle_method(file_, lines_, line, i, reflection_methods_added):
+def handle_method(file_, lines_, line, i, reflection_methods_added, class_name):
     method_signature = line
 
     if not reflection_methods_added and method_predicate(line):
-        file_.write("\n" + reflect_strings + "\n")
+        file_.write("\n" + smali_injection.replace("{class_name}",class_name) + "\n")
         reflection_methods_added = True
 
     file_.write(lines_[i])
@@ -81,12 +86,11 @@ def handle_method(file_, lines_, line, i, reflection_methods_added):
 
 def handle_class(file_, lines_, line, i):
     class_ = line.split()[-1][1:-1]
-    pkg = ".".join(class_.split(".")[:-1])
 
-    print("CLASS: ", class_, pkg)
+    print("CLASS:", class_)
 
     file_.write(lines_[i])
-    return class_, pkg
+    return class_
 
 
 def patch(file_, lines_: list[str]):
@@ -94,7 +98,6 @@ def patch(file_, lines_: list[str]):
 
     class_name = None
     method_signature = None
-    package_name = None
 
     reflection_methods_added = False
 
@@ -103,15 +106,15 @@ def patch(file_, lines_: list[str]):
         l_i = strip_line(i)
 
         if l_i.startswith(".class"):
-            class_name, package_name = \
+            class_name = \
                 handle_class(file_, lines_, l_i, i)
             i += 1
             continue
 
         if l_i.startswith(".method"):
             method_signature, reflection_methods_added = \
-                handle_method(file_, lines_, l_i, i, reflection_methods_added)
-            i+=1
+                handle_method(file_, lines_, l_i, i, reflection_methods_added, class_name)
+            i += 1
             continue
 
         if l_i.startswith(".locals") and method_predicate(method_signature):
@@ -124,9 +127,10 @@ def patch(file_, lines_: list[str]):
 
 
 def is_ignored_package(package):
-    out=any(x in package for x in ignored_packages)
+    out = any(x in package for x in ignored_packages)
     if out:
         print("package ignored:", package)
+
 
 def is_ignored_method(method):
     out = any(x in method for x in ignored_methods)
@@ -134,11 +138,13 @@ def is_ignored_method(method):
         print("method ignored:", method)
     return out
 
+
 def is_ignored_class(class_):
-    out=any(x in class_ for x in ignored_classes)
+    out = any(x in class_ for x in ignored_classes)
     if out:
         print("class ignored:", class_)
     return out
+
 
 if __name__ == '__main__':
     for root, dir_, filenames in os.walk(directory):
