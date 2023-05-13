@@ -1,13 +1,21 @@
 import os
+import re
 
 # directory path of the .smali files
 directory = "./"
 
 ignored_packages = [
-    "google", "android",
-    "kotlin", "kotlinx",
-    "java", "javax",
+    #"google", "android",
+  #  "kotlin", "kotlinx",
+  #  "java", "javax",
 ]
+
+ignored_methods = [
+    "checkForString","reflectStringArguments","reflectStringArgumentsRecursive"
+]
+
+primitive_types="ZBSCIJFD"
+
 
 with open("./reflect.smali", "r") as f:
     reflect_strings = f.read()
@@ -34,23 +42,26 @@ for root, dir_, filenames in os.walk(directory):
                 def strip_line(i_):
                     return lines[i_].strip()
 
-                def get_parameters_count(signature):
-                    try:
-                        parameters = signature.split("(")[1].split(")")[0].split(";")[:-1]
-                    except IndexError as e:
-                        print(e)
-                        return 0
-                    return len(parameters)
+                def get_parameters(signature:str):
+                    signature = signature.split("(")[1].split(")")[0]
+                    params = re.findall(r'[ZBSCIJFD]|L[^;]+;', signature)
+                    return params
 
                 def method_predicate(signature):
                     is_valid_signature = not "abstract" in signature \
                         and not "native" in signature
                     if not is_valid_signature:
                         return False
-                    return get_parameters_count(signature)>0
+                    if any(x in signature for x in ignored_methods):
+                        return False
+                    return len(get_parameters(signature))>0
+
+                def is_static_method(signature):
+                    return "static" in signature
 
                 class_name = None
                 reflection_methods_added = False
+                method_signature=None
                 while i < len(lines):
                     l_i = strip_line(i)
                     if l_i.startswith(".class"):
@@ -62,8 +73,11 @@ for root, dir_, filenames in os.walk(directory):
                         i += 1
                         continue
 
-                    if l_i.startswith(".method") and not reflection_methods_added:
-                        if "checkForString" not in l_i:
+                    if l_i.startswith(".method") and method_predicate(l_i):
+                        method_signature = l_i
+
+                    if l_i.startswith(".method") and not reflection_methods_added and method_predicate(l_i):
+                        if all(x not in l_i for x in ignored_methods):
                             file.write("\n" + reflect_strings + "\n" + lines[i])
                         else:
                             file.write(lines[i])
@@ -71,15 +85,20 @@ for root, dir_, filenames in os.walk(directory):
                         reflection_methods_added = True
                         continue
 
-                    if l_i.startswith(".locals") and method_predicate(strip_line(i - 1)):
+                    if l_i.startswith(".locals") and method_signature:
                         locals_count = int(l_i.split()[1])
                         file.write("\n    .locals {}\n".format(locals_count))
 
-                        params = get_parameters_count(strip_line(i - 1))
+                        p0 = 0 if is_static_method(method_signature) else 1
+                        params = get_parameters(method_signature)
+
+                        print("METHOD:",method_signature)
 
                         if class_name is not None:
-                            for i in range(params):
-                                file.write(f"    invoke-static {{p{i}}}, L{class_name};->reflectStringArguments(Ljava/lang/Object;)V\n")
+                            for j,p in enumerate(params):
+                                if p in primitive_types:
+                                    continue
+                                file.write(f"    invoke-static/range {{p{p0+j} .. p{p0+j}}}, L{class_name};->reflectStringArguments(Ljava/lang/Object;)V\n")
 
                         i += 1
                         continue
