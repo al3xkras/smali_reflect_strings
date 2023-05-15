@@ -12,13 +12,16 @@ ignored_packages = [
 ignored_methods = [
     "checkForString",
     "reflectStringArguments",
-    "reflectStringArgumentsRecursive",
-    "MainActivity"
+    "reflectStringArgumentsRecursive"
 ]
 
 ignored_classes = [
-    "trace",
-    "UnityPlayer"
+    "trace"
+]
+
+use_all_methods=False
+use_methods = [
+    "UnitySendMessage"
 ]
 
 primitive_types = "ZBSCIJFD"
@@ -48,8 +51,6 @@ def method_predicate(signature):
                "native" not in signature
     if not is_valid:
         return False
-    if any(x in signature for x in ignored_methods):
-        return False
     return not is_ignored_method(signature)
 
 
@@ -73,14 +74,16 @@ def handle_locals(file_, class_name: str, method_signature: str, current_line: s
 
 
 def handle_method(file_, lines_, line, i, reflection_methods_added, class_name):
-    method_signature = line
+    p = method_predicate(line)
+    method_signature = line if p else None
+    if p:
+        print("METHOD:",method_signature)
 
-    if not reflection_methods_added and method_predicate(line):
+    if not reflection_methods_added and p:
         file_.write("\n" + smali_injection.replace("{class_name}",class_name) + "\n")
         reflection_methods_added = True
 
     file_.write(lines_[i])
-
     return method_signature, reflection_methods_added
 
 
@@ -133,10 +136,12 @@ def is_ignored_package(package):
 
 
 def is_ignored_method(method):
-    out = any(x in method for x in ignored_methods)
-    if out:
+    ignored = any(x in method for x in ignored_methods)
+    if ignored:
         print("method ignored:", method)
-    return out
+    if not ignored and not use_all_methods:
+        return not any(x in method for x in use_methods)
+    return ignored
 
 
 def is_ignored_class(class_):
